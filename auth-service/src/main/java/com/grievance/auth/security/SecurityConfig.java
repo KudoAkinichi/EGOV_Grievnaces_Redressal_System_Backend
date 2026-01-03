@@ -26,18 +26,29 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+    private final InternalServiceAuthorizationManager internalAuthManager;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+
+                        // 🔓 Public
                         .requestMatchers("/auth/register", "/auth/login", "/auth/validate").permitAll()
+
+                        // 🔐 INTERNAL SERVICE (NO JWT)
+                        .requestMatchers("/users/officers/available/**")
+                        .access(internalAuthManager)
+
+                        // 🔐 ADMIN ONLY
                         .requestMatchers("/users/**").hasRole("ADMIN")
+
+                        // 🔐 Everything else
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

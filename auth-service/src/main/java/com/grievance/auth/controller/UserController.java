@@ -93,8 +93,9 @@ public class UserController {
     }
 
     @GetMapping("/officers/available/{departmentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERVISOR')")
-    public ResponseEntity<ApiResponse<List<User>>> getAvailableOfficers(@PathVariable Long departmentId) {
+    public ResponseEntity<ApiResponse<List<User>>> getAvailableOfficers(
+            @PathVariable Long departmentId) {
         return ResponseEntity.ok(userService.getAvailableOfficers(departmentId));
     }
+
 }

@@ -18,10 +18,16 @@ public class RabbitMQProducer {
 
     public void sendNotification(Map<String, String> emailData) {
         try {
+            log.info("🔄 Attempting to send notification to RabbitMQ...");
+            log.info("📧 Email Data: {}", emailData);
+
             rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY, emailData);
-            log.info("Email notification sent to queue: {}", emailData.get("to"));
+
+            log.info("✅ Email notification sent to queue successfully");
+            log.info("📬 Exchange: {}, Routing Key: {}", EXCHANGE, ROUTING_KEY);
         } catch (Exception e) {
-            log.error("Failed to send email notification: {}", e.getMessage());
+            log.error("❌ Failed to send email notification: {}", e.getMessage());
+            e.printStackTrace();
         }
     }
 }
