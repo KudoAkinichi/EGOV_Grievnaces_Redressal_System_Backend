@@ -3,6 +3,7 @@ package com.grievance.service;
 import com.grievance.repository.GrievanceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -17,44 +18,48 @@ public class AssignmentService {
     private final GrievanceRepository grievanceRepository;
     private final WebClient.Builder webClientBuilder;
 
-    /**
-     * Get officer with least active grievances in a department
-     */
+    @Value("${internal.service.token}")
+    private String internalServiceToken;
+
+
     public Long getOfficerWithLeastLoad(Long departmentId) {
         try {
-            // Call Auth Service to get all officers in department
             List<Map<String, Object>> officers = webClientBuilder.build()
                     .get()
                     .uri("http://localhost:8081/users/officers/available/" + departmentId)
+                    .header("X-INTERNAL-TOKEN", internalServiceToken)
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .map(response -> (List<Map<String, Object>>) ((Map<String, Object>) response.get("data")))
+                    .map(response -> (List<Map<String, Object>>) response.get("data"))
                     .block();
 
+
             if (officers == null || officers.isEmpty()) {
-                log.error("No officers found for department: {}", departmentId);
+                log.warn("No officers found for department {}", departmentId);
                 return null;
             }
 
-            // Find officer with least active grievances
             Long selectedOfficerId = null;
             Long minLoad = Long.MAX_VALUE;
 
             for (Map<String, Object> officer : officers) {
                 Long officerId = Long.valueOf(officer.get("id").toString());
-                Long activeGrievances = grievanceRepository.countActiveGrievancesByOfficer(officerId);
+                Long activeCount =
+                        grievanceRepository.countActiveGrievancesByOfficer(officerId);
 
-                if (activeGrievances < minLoad) {
-                    minLoad = activeGrievances;
+                if (activeCount < minLoad) {
+                    minLoad = activeCount;
                     selectedOfficerId = officerId;
                 }
             }
 
-            log.info("Selected officer {} with {} active grievances", selectedOfficerId, minLoad);
+            log.info("Auto-assigned officer {} with {} active grievances",
+                    selectedOfficerId, minLoad);
+
             return selectedOfficerId;
 
         } catch (Exception e) {
-            log.error("Error getting officer with least load: {}", e.getMessage());
+            log.error("Error getting officer with least load", e);
             return null;
         }
     }

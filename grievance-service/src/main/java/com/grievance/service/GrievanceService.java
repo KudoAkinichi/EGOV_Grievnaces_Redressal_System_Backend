@@ -175,6 +175,28 @@ public class GrievanceService {
         return ApiResponse.success("Grievances fetched successfully", responses);
     }
 
+    public ApiResponse<Page<GrievanceResponse>> getAllGrievances(Long departmentId, Long categoryId,
+                                                                 GrievanceStatus status, Pageable pageable) {
+        // Use Specification for dynamic filtering
+        Page<Grievance> grievances;
+
+        if (departmentId != null && categoryId != null && status != null) {
+            // Complex query - add custom repository method
+            grievances = grievanceRepository.findByDepartmentIdAndCategoryIdAndStatus(
+                    departmentId, categoryId, status, pageable);
+        } else if (departmentId != null) {
+            grievances = grievanceRepository.findByDepartmentId(departmentId, pageable);
+        } else if (status != null) {
+            grievances = grievanceRepository.findByStatus(status, pageable);
+        } else {
+            grievances = grievanceRepository.findAll(pageable);
+        }
+
+        // Map to response
+        Page<GrievanceResponse> responses = grievances.map(g -> mapToResponse(g, null, null, null));
+        return ApiResponse.success("Grievances fetched successfully", responses);
+    }
+
     public ApiResponse<GrievanceResponse> getGrievanceById(Long grievanceId) {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance not found"));
@@ -223,6 +245,61 @@ public class GrievanceService {
 
         return ApiResponse.success("Dashboard stats fetched successfully", stats);
     }
+
+    public ApiResponse<Map<String, Object>> getDepartmentWiseReport() {
+        List<Department> departments = departmentRepository.findAll();
+        Map<String, Object> report = new HashMap<>();
+
+        for (Department dept : departments) {
+            Map<String, Long> deptStats = new HashMap<>();
+            deptStats.put("total", grievanceRepository.countByDepartmentId(dept.getId()));
+            deptStats.put("open", grievanceRepository.countByDepartmentIdAndStatus(dept.getId(), GrievanceStatus.ASSIGNED));
+            deptStats.put("resolved", grievanceRepository.countByDepartmentIdAndStatus(dept.getId(), GrievanceStatus.RESOLVED));
+            deptStats.put("closed", grievanceRepository.countByDepartmentIdAndStatus(dept.getId(), GrievanceStatus.CLOSED));
+            report.put(dept.getName(), deptStats);
+        }
+
+        return ApiResponse.success("Department-wise report generated", report);
+    }
+
+    public ApiResponse<Map<String, Object>> getAverageResolutionTime() {
+        List<Grievance> resolvedGrievances = grievanceRepository.findByStatus(GrievanceStatus.RESOLVED, Pageable.unpaged()).getContent();
+
+        if (resolvedGrievances.isEmpty()) {
+            return ApiResponse.success("No resolved grievances yet", Map.of("averageHours", 0));
+        }
+
+        long totalHours = resolvedGrievances.stream()
+                .filter(g -> g.getResolvedAt() != null)
+                .mapToLong(g -> java.time.Duration.between(g.getCreatedAt(), g.getResolvedAt()).toHours())
+                .sum();
+
+        double avgHours = (double) totalHours / resolvedGrievances.size();
+
+        Map<String, Object> report = new HashMap<>();
+        report.put("averageHours", avgHours);
+        report.put("totalResolved", resolvedGrievances.size());
+
+        return ApiResponse.success("Average resolution time calculated", report);
+    }
+
+    public ApiResponse<Map<String, Object>> getCategoryWiseReport() {
+        List<Category> categories = categoryRepository.findAll();
+        Map<String, Object> report = new HashMap<>();
+
+        for (Category category : categories) {
+            Map<String, Long> stats = new HashMap<>();
+            stats.put("total", grievanceRepository.countByCategoryId(category.getId()));
+            stats.put("open", grievanceRepository.countByCategoryIdAndStatus(category.getId(), GrievanceStatus.ASSIGNED));
+            stats.put("resolved", grievanceRepository.countByCategoryIdAndStatus(category.getId(), GrievanceStatus.RESOLVED));
+            stats.put("closed", grievanceRepository.countByCategoryIdAndStatus(category.getId(), GrievanceStatus.CLOSED));
+
+            report.put(category.getName(), stats);
+        }
+
+        return ApiResponse.success("Category-wise report generated", report);
+    }
+
 
     @Transactional
     public ApiResponse<?> addComment(Long grievanceId, CommentRequest request, Long userId, String role) {
