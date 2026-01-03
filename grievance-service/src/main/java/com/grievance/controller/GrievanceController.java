@@ -1,6 +1,7 @@
 package com.grievance.controller;
 
 import com.grievance.common.dto.ApiResponse;
+import com.grievance.common.enums.GrievanceStatus;
 import com.grievance.dto.*;
 import com.grievance.model.GrievanceComment;
 import com.grievance.model.GrievanceStatusHistory;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/grievances")
@@ -38,6 +40,18 @@ public class GrievanceController {
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(grievanceService.getMyGrievances(citizenId, pageable));
+    }
+
+    // GET /grievances?status=RESOLVED
+    @GetMapping
+    public ResponseEntity<ApiResponse<Page<GrievanceResponse>>> getAllGrievances(
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) GrievanceStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(grievanceService.getAllGrievances(departmentId, categoryId, status, pageable));
     }
 
     @GetMapping("/{id}")
@@ -131,5 +145,20 @@ public class GrievanceController {
             @PathVariable Long docId,
             @RequestHeader("X-User-Id") Long userId) {
         return ResponseEntity.ok(documentService.deleteDocument(docId, userId));
+    }
+
+    @GetMapping("/reports/by-department")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDepartmentWiseReport() {
+        return ResponseEntity.ok(grievanceService.getDepartmentWiseReport());
+    }
+
+    @GetMapping("/reports/by-category")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getCategoryWiseReport() {
+        return ResponseEntity.ok(grievanceService.getCategoryWiseReport());
+    }
+
+    @GetMapping("/reports/resolution-time")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAverageResolutionTime() {
+        return ResponseEntity.ok(grievanceService.getAverageResolutionTime());
     }
 }
