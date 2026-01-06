@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: notification-service
+  config:
+    import: optional:configserver:http://localhost:9090
+  cloud:
+    config:
+      enabled: true
+      fail-fast: false
