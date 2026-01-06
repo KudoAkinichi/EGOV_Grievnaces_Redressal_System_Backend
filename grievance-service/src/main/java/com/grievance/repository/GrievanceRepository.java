@@ -62,4 +62,11 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
 
     @Query("SELECT COUNT(g) FROM Grievance g WHERE g.categoryId = :categoryId AND g.status = :status")
     Long countByCategoryIdAndStatus(@Param("categoryId") Long categoryId, @Param("status") GrievanceStatus status);
+
+    Page<Grievance> findByDepartmentIdAndStatus(
+            Long departmentId,
+            GrievanceStatus status,
+            Pageable pageable
+    );
+
 }

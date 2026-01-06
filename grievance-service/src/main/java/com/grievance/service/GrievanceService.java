@@ -11,6 +11,7 @@ import com.grievance.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -347,6 +348,37 @@ public class GrievanceService {
         return ApiResponse.success("Grievance withdrawn successfully", null);
     }
 
+    @Transactional(readOnly = true)
+    public ApiResponse<Page<Grievance>> getDepartmentGrievances(
+            Long departmentId,
+            String status,
+            int page,
+            int size
+    ) {
+        if (departmentId == null) {
+            return ApiResponse.success("No department assigned", Page.empty());
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Grievance> grievances;
+
+        if (status != null && !status.isBlank()) {
+            grievances = grievanceRepository.findByDepartmentIdAndStatus(
+                    departmentId,
+                    GrievanceStatus.valueOf(status),
+                    pageable
+            );
+        } else {
+            grievances = grievanceRepository.findByDepartmentId(
+                    departmentId,
+                    pageable
+            );
+        }
+
+        return ApiResponse.success("Department grievances fetched successfully", grievances);
+    }
+
+
     // Helper methods
     private String generateGrievanceNumber() {
         String year = String.valueOf(LocalDateTime.now().getYear());
@@ -397,5 +429,46 @@ public class GrievanceService {
         response.setCreatedAt(grievance.getCreatedAt());
         response.setUpdatedAt(grievance.getUpdatedAt());
         return response;
+    }
+
+    // In GrievanceService.java - add these methods
+
+    @Transactional(readOnly = true)
+    public Page<GrievanceResponse> getDepartmentGrievances(Long departmentId, Pageable pageable) {
+        log.info("Fetching all grievances for department: {}", departmentId);
+        Page<Grievance> grievances = grievanceRepository.findByDepartmentId(departmentId, pageable);
+        return grievances.map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<GrievanceResponse> getDepartmentGrievancesByStatus(
+            Long departmentId,
+            GrievanceStatus status,
+            Pageable pageable
+    ) {
+        log.info("Fetching grievances - Department: {}, Status: {}", departmentId, status);
+        Page<Grievance> grievances = grievanceRepository.findByDepartmentIdAndStatus(
+                departmentId,
+                status,
+                pageable
+        );
+        return grievances.map(this::toResponse);
+    }
+
+    private GrievanceResponse toResponse(Grievance grievance) {
+        return GrievanceResponse.builder()
+                .id(grievance.getId())
+                .grievanceNumber(grievance.getGrievanceNumber())
+                .citizenId(grievance.getCitizenId())
+                .departmentId(grievance.getDepartmentId())
+                .categoryId(grievance.getCategoryId())
+                .title(grievance.getTitle())
+                .description(grievance.getDescription())
+                .status(grievance.getStatus())
+                .assignedOfficerId(grievance.getAssignedOfficerId())
+                .priority(grievance.getPriority())
+                .createdAt(grievance.getCreatedAt())
+                .updatedAt(grievance.getUpdatedAt())
+                .build();
     }
 }

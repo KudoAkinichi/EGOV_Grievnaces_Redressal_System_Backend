@@ -1,8 +1,10 @@
+// grievance-service/src/main/java/com/grievance/dto/GrievanceResponse.java
 package com.grievance.dto;
 
 import com.grievance.common.enums.GrievanceStatus;
 import com.grievance.model.Grievance;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +13,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class GrievanceResponse {
 
     private Long id;
