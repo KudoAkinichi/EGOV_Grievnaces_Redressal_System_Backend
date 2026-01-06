@@ -1,45 +1,69 @@
 server:
-  port: 8080
+  port: 7070
 
 spring:
+  application:
+    name: API-GATEWAY
+
   cloud:
     gateway:
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - http://localhost:4200
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+
+      discovery:
+        locator:
+          enabled: false
+
       routes:
         - id: auth-service
-          uri: http://localhost:8081
+          uri: lb://AUTH-SERVICE
           predicates:
-            - Path=/api/auth/**
+            - Path=/api/auth/**,/api/users/**
           filters:
             - StripPrefix=1
 
         - id: grievance-service
-          uri: http://localhost:8082
+          uri: lb://GRIEVANCE-SERVICE
           predicates:
-            - Path=/api/grievances/**,/api/departments/**
+            - Path=/api/grievances,/api/grievances/**,/api/departments/**,/api/supervisor/**
           filters:
             - StripPrefix=1
 
+
+
         - id: feedback-service
-          uri: http://localhost:8084
+          uri: lb://FEEDBACK-SERVICE
           predicates:
             - Path=/api/feedbacks/**
           filters:
             - StripPrefix=1
 
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "http://localhost:4200"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - PATCH
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
+        - id: notification-service
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/notify/**
+          filters:
+            - StripPrefix=1
 
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8000/eureka/
