@@ -2,6 +2,7 @@ package com.grievance.service;
 
 import com.grievance.common.dto.ApiResponse;
 import com.grievance.common.exception.ResourceNotFoundException;
+import com.grievance.dto.DocumentResponse;
 import com.grievance.dto.DocumentUploadRequest;
 import com.grievance.model.GrievanceDocument;
 import com.grievance.repository.GrievanceDocumentRepository;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,33 +44,36 @@ public class DocumentService {
 
         GrievanceDocument saved = documentRepository.save(document);
 
-        return ApiResponse.success("Document uploaded successfully", saved.getId());
+        return ApiResponse.success("Document uploaded successfully",
+                DocumentResponse.fromEntity(saved));
     }
 
-    public ApiResponse<List<GrievanceDocument>> getDocuments(Long grievanceId) {
+    public ApiResponse<List<DocumentResponse>> getDocuments(Long grievanceId) {
         List<GrievanceDocument> documents = documentRepository.findByGrievanceId(grievanceId);
-        // Don't send file data in list response
-        documents.forEach(doc -> doc.setFileData(null));
-        return ApiResponse.success("Documents fetched successfully", documents);
+
+        // Convert to DocumentResponse with Base64 encoded data
+        List<DocumentResponse> responses = documents.stream()
+                .map(DocumentResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        return ApiResponse.success("Documents fetched successfully", responses);
     }
 
-    public ApiResponse<GrievanceDocument> getDocument(Long documentId) {
+    public ApiResponse<DocumentResponse> getDocument(Long documentId) {
         GrievanceDocument document = documentRepository.findById(documentId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Document not found"));
-        return ApiResponse.success("Document fetched successfully", document);
+
+        return ApiResponse.success("Document fetched successfully",
+                DocumentResponse.fromEntity(document));
     }
+
     @Transactional
     public ApiResponse<?> deleteDocument(Long documentId, Long userId) {
         GrievanceDocument document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
 
-        // Only allow deletion by uploader
-        if (!document.getUploadedBy().equals(userId)) {
-            return ApiResponse.error("You can only delete documents you uploaded");
-        }
-
-        documentRepository.delete(document);
+        documentRepository.deleteById(documentId);
         return ApiResponse.success("Document deleted successfully", null);
     }
 }
