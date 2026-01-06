@@ -1,9 +1,42 @@
+# api-gateway/src/main/resources/application.yml
 spring:
+  main:
+    web-application-type: reactive
   application:
     name: api-gateway
   config:
-    import: optional:configserver:http://localhost:8888
+    import: optional:configserver:http://localhost:9090
   cloud:
     config:
       enabled: true
       fail-fast: false
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials
+      routes:
+        # ✅ Grievance Service
+        - id: grievance-service
+          uri: http://localhost:8080
+          predicates:
+            - Path=/api/grievances/**,/api/supervisor/**,/api/officer/**,/api/citizen/**
+          filters:
+            - RewritePath=/api/(?<path>.*), /$\{path}
+            - AddResponseHeader=Access-Control-Allow-Origin, http://localhost:4200
+            - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,PATCH,OPTIONS
+            - AddResponseHeader=Access-Control-Allow-Headers, Content-Type,Authorization,X-User-Id,X-User-Role,X-Department-ID
+            - AddResponseHeader=Access-Control-Allow-Credentials, true
+
+        # ✅ Auth Service
+        - id: auth-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/auth/**,/api/users/**
+          filters:
+            - RewritePath=/api/(?<path>.*), /$\{path}
+            - AddResponseHeader=Access-Control-Allow-Origin, http://localhost:4200
+            - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,PATCH,OPTIONS
+            - AddResponseHeader=Access-Control-Allow-Headers, Content-Type,Authorization,X-User-Id,X-User-Role
+            - AddResponseHeader=Access-Control-Allow-Credentials, true
+
+server:
+  port: 7070
