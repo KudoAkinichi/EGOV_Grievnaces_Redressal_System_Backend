@@ -48,7 +48,7 @@ public class UserController {
     }
 
     @GetMapping("/by-department/{departmentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<User>>> getUsersByDepartment(@PathVariable Long departmentId) {
         return ResponseEntity.ok(userService.getUsersByDepartment(departmentId));
     }
