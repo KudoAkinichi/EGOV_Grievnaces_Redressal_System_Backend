@@ -41,8 +41,13 @@ public class SecurityConfig {
                         .requestMatchers("/users/officers/available/**")
                         .access(internalAuthManager)
 
+                        // 🔐 SUPERVISOR + ADMIN
+                        .requestMatchers("/users/by-department/**")
+                        .hasAnyRole("ADMIN", "SUPERVISOR")
+
                         // 🔐 ADMIN ONLY
-                        .requestMatchers("/users/**").hasRole("ADMIN")
+                        .requestMatchers("/users/**")
+                        .hasRole("ADMIN")
 
                         // 🔐 Everything else
                         .anyRequest().authenticated()
