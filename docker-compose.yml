@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Infrastructure Services
   mysql:
     image: mysql:8.0
     container_name: grievance-mysql
@@ -13,6 +14,10 @@ services:
       - mysql-data:/var/lib/mysql
     networks:
       - grievance-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -25,6 +30,167 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     networks:
       - grievance-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      timeout: 10s
+      retries: 5
+
+  # Config Server - Must start first
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "9090:9090"
+    networks:
+      - grievance-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/actuator/health"]
+      timeout: 10s
+      retries: 10
+      interval: 5s
+
+  # Eureka Server - Starts after Config Server
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8000:8000"
+    networks:
+      - grievance-network
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/actuator/health"]
+      timeout: 10s
+      retries: 10
+      interval: 5s
+
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    networks:
+      - grievance-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/grievance_auth?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8000/eureka/
+      - SPRING_RABBITMQ_HOST=rabbitmq
+
+  # Grievance Service
+  grievance-service:
+    build:
+      context: .
+      dockerfile: grievance-service/Dockerfile
+    container_name: grievance-service
+    ports:
+      - "8082:8082"
+    networks:
+      - grievance-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/grievance_main?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8000/eureka/
+      - SPRING_RABBITMQ_HOST=rabbitmq
+
+  # Feedback Service
+  feedback-service:
+    build:
+      context: .
+      dockerfile: feedback-service/Dockerfile
+    container_name: feedback-service
+    ports:
+      - "8084:8084"
+    networks:
+      - grievance-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/grievance_feedback?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8000/eureka/
+
+  # Notification Service
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    ports:
+      - "8083:8083"
+    networks:
+      - grievance-network
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8000/eureka/
+      - MAIL_USERNAME=${MAIL_USERNAME:-arookrishna@gmail.com}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-aewmgomqnvptocdr}
+
+  # API Gateway - Starts last
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "7070:7070"
+    networks:
+      - grievance-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      grievance-service:
+        condition: service_started
+      feedback-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8000/eureka/
 
 volumes:
   mysql-data:
